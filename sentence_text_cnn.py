@@ -1,5 +1,7 @@
 import tensorflow as tf
-from tensorflow.keras import Input, layers, Model, backend, losses
+import numpy as np
+from tensorflow.keras import Input, layers, Model, backend, losses, callbacks
+from sklearn.metrics import classification_report
 
 class SentenceTextCNN:
     """ Text Classification Convolutional Neural Network """
@@ -11,13 +13,13 @@ class SentenceTextCNN:
             'filter_sizes',
             'num_filters_per_size', 
             'num_classes',
-            'dropout_rate'
+            'dropout_rate',
+            'batch_size'
         ]
         
         for key in valid_keys:
             setattr(self, key, kwargs.get(key))
 
-        input_shape = (self.seq_length, self.embedding_dimensions, 1)
         self.model = self.build_model()
 
     
@@ -28,10 +30,12 @@ class SentenceTextCNN:
         concatenate = layers.Concatenate(axis=-1)
         flatten = layers.Flatten(data_format='channels_last')
         dropout = layers.Dropout(self.dropout_rate)
+        dense = layers.Dense(self.num_classes)
         softmax = layers.Softmax(axis=-1)
+        
         pooled_outputs = []
 
-        for i, filter_size in enumerate(self.filter_sizes):
+        for filter_size in self.filter_sizes:
             filter_shape = (filter_size, self.embedding_dimensions)
 
             conv2d = layers.Conv2D(
@@ -50,28 +54,49 @@ class SentenceTextCNN:
             x = flatten(x)
             pooled_outputs.append(x)
         
-
         pooled_outputs = concatenate(pooled_outputs)
-        pooled_outputs = dropout(pooled_outputs)
+        pooled_outputs = dropout(pooled_outputs, training=True)
+        pooled_outputs = dense(pooled_outputs)
         pooled_outputs = softmax(pooled_outputs)
         
         model = Model(inputs=inputs, outputs=pooled_outputs, name='sentence_cnn')
-        model.summary()
         model.compile(
             loss=losses.binary_crossentropy,
-            optimizer='adam'
+            optimizer='adam',
+            metrics=['accuracy']
         )
         return model
 
 
-    def train(self, x_train, y_train, x_dev, y_dev):
+    def train(self, train_x, train_y, dev_x, dev_y, num_epochs=5):
+        model_checkpoint = callbacks.ModelCheckpoint(
+            './weights.hdf5',
+            verbose=1,
+            save_best_only=True
+        )
         self.model.fit(
-            x_train,
-            y_train,
-            validation_data=(x_dev, y_dev)
+            train_x,
+            train_y,
+            self.batch_size,
+            num_epochs,
+            validation_data=(dev_x, dev_y),
+            callbacks=[model_checkpoint]
         )
 
 
-    def predict(self, x_test):
-        predictions = self.model.predict(x_test)
-        return predictions
+    def evaluate(self, test_x, test_y):
+        target_names = ['class {}'.format(i) for i in range(self.num_classes)]
+ 
+        pred_y = self.model.predict(
+            test_x,
+            self.batch_size,
+            verbose=1
+        )
+        pred_y = np.argmax(pred_y, axis=1)
+
+        report = classification_report(
+            test_y,
+            pred_y,
+            target_names=target_names
+        )
+        return report

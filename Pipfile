@@ -9,6 +9,8 @@ verify_ssl = true
 tensorflow = "*"
 pandas = "*"
 pytreebank = "*"
+sklearn = "*"
+prettytable = "*"
 gensim = "*"
 
 [requires]
