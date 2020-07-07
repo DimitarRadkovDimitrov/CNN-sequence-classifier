@@ -2,36 +2,45 @@ import re
 import json
 import os
 import pytreebank
-import pandas as pd
 import numpy as np
 import time
+import pickle
+import sys
+import matplotlib.pyplot as plt
 from prettytable import PrettyTable
 from gensim import downloader
 from gensim.models import KeyedVectors, Word2Vec
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 
 class SSTDataPreprocessor:
     """ Data preprocessing class """
 
-    def __init__(self, config_filename, sequence_length, static=True, number_of_classes=2):
-        self.number_of_classes = number_of_classes
-        self.sequence_length = sequence_length
+    def __init__(self, config_filename, num_classes=2, static=True):
+        self.num_classes = num_classes
+        self.sequence_length = 40
         self.embedding_dimensions = 300
         self.static = static
 
         self.load_config_file(config_filename)
-
-        if not os.path.isdir(self.config['datasets']['root']):
-            os.mkdir(self.config['datasets']['root'])
-            self.download_and_save_datasets()
-
-        self.load_datasets()
+        self.load_dataset()
         
-        if not os.path.isdir(self.config['models']['root']):
-            os.mkdir(self.config['models']['root'])
-            self.download_and_save_models()
+        if static is True:
+            if not os.path.isdir(self.config['models']['root']):
+               os.mkdir(self.config['models']['root'])
+               self.download_and_save_models()
+            
+            self.load_model_keyed_vectors()
+            self.print_analysis()
+            self.train = self.get_training_embedded()
+            self.dev = self.get_dev_embedded()
+            self.test = self.get_test_embedded()
         
-        self.load_model_keyed_vectors()
+        dataset = {}
+        dataset['train'] = self.train
+        dataset['dev'] = self.dev
+        dataset['test'] = self.test
+        self.save_data(dataset)
 
 
     def load_config_file(self, filename):
@@ -39,10 +48,13 @@ class SSTDataPreprocessor:
             self.config = json.load(f)
 
 
-    def download_and_save_datasets(self):
+    def load_dataset(self):
         dataset = pytreebank.load_sst()
-        self.save_fine_grained_dataset(dataset, self.config['datasets']['sst_5'])
-        self.save_course_grained_dataset(dataset, self.config['datasets']['sst_2'])
+
+        if self.num_classes == 5:
+            self.get_train_dev_test_fine(dataset)
+        else:
+            self.get_train_dev_test_course(dataset)
 
 
     def download_and_save_models(self):
@@ -68,19 +80,6 @@ class SSTDataPreprocessor:
         return model
 
 
-    def load_datasets(self):
-        dataset_root_filename = None
-
-        if self.number_of_classes == 5:
-            dataset_root_filename = self.config['datasets']['sst_5']
-        else:
-            dataset_root_filename = self.config['datasets']['sst_2']
-
-        self.train = pd.read_csv(dataset_root_filename['train'], sep='\t', header=None)
-        self.dev = pd.read_csv(dataset_root_filename['dev'], sep='\t', header=None)
-        self.test = pd.read_csv(dataset_root_filename['test'], sep='\t', header=None)
-
-
     def load_model_keyed_vectors(self):
         model_vector_map_name = ""
 
@@ -95,48 +94,60 @@ class SSTDataPreprocessor:
         print("DONE. Time elapsed: {} seconds.".format(str(time.time() - start_time)))
 
 
-    def save_fine_grained_dataset(self, dataset, dataset_root_dir):
-        self.fprintf_fine_grained_labeled_data(dataset['train'], dataset_root_dir['train'])        
-        self.fprintf_fine_grained_labeled_data(dataset['dev'], dataset_root_dir['dev'])
-        self.fprintf_fine_grained_labeled_data(dataset['test'], dataset_root_dir['test'])
+    def get_train_dev_test_fine(self, dataset):
+        self.train = self.get_fine_grained_labeled_data(dataset['train'])
+        self.dev = self.get_fine_grained_labeled_data(dataset['dev'])
+        self.test = self.get_fine_grained_labeled_data(dataset['test'])
 
 
-    def save_course_grained_dataset(self, dataset, dataset_root_dir):
-        self.fprintf_course_grained_labeled_data(dataset['train'], dataset_root_dir['train'])
-        self.fprintf_course_grained_labeled_data(dataset['dev'], dataset_root_dir['dev'])
-        self.fprintf_course_grained_labeled_data(dataset['test'], dataset_root_dir['test'])
+    def get_train_dev_test_course(self, dataset):
+        self.train = self.get_course_grained_labeled_data(dataset['train'])
+        self.dev = self.get_course_grained_labeled_data(dataset['dev'])
+        self.test = self.get_course_grained_labeled_data(dataset['test'])
 
 
-    def fprintf_fine_grained_labeled_data(self, training_data, filename):
-        with open(filename, "w") as output_file:
-            for data in training_data:
-                label, sentence = data.to_labeled_lines()[0]
-                sentence = self.clean_sentence(sentence)
-                output_file.write("{}\t{}\n".format(sentence, label))
+    def get_fine_grained_labeled_data(self, training_data):
+        data_x = []
+        data_y = []
+
+        for data in training_data:
+            label, sentence = data.to_labeled_lines()[0]
+            sentence = self.clean_sentence(sentence)
+            data_x.append(sentence)
+            data_y.append(int(label))
+
+        return [data_x, data_y]
 
 
-    def fprintf_course_grained_labeled_data(self, training_data, filename):
-        with open(filename, "w") as output_file:
-            for data in training_data:
-                label, sentence = data.to_labeled_lines()[0]
-                sentence = self.clean_sentence(sentence)
-                if label < 2:
-                    output_file.write("{}\t{}\n".format(sentence, 0))
-                elif label > 2:
-                    output_file.write("{}\t{}\n".format(sentence, 1))
+    def get_course_grained_labeled_data(self, training_data):
+        data_x = []
+        data_y = []
+
+        for data in training_data:
+            label, sentence = data.to_labeled_lines()[0]
+            sentence = self.clean_sentence(sentence)
+            if label < 2:
+                data_x.append(sentence)
+                data_y.append(0)
+            elif label > 2:
+                data_x.append(sentence)
+                data_y.append(1)
+
+        return [data_x, data_y]
 
 
     def clean_sentence(self, sentence):
-        new_sentence = ''
-
-        for word in sentence.split(' '):
-            new_word = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", word)   
-            new_word = re.sub(r"\s{2,}", " ", new_word).strip().lower() 
-            new_sentence += new_word + ' '
-
-        return new_sentence
+        rev = [sentence.strip()]
+        rev = self.clean_str_sst(' '.join(rev))
+        return rev
     
+
+    def clean_str_sst(self, string):
+        string = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", string)   
+        string = re.sub(r"\s{2,}", " ", string)    
+        return string.strip().lower()
     
+
     def print_analysis(self):
         if self.train is None or self.dev is None or self.test is None:
             print("Error: Unable to load datasets")
@@ -152,8 +163,8 @@ class SSTDataPreprocessor:
             label_frequencies = self.get_label_stats(self.train[1])
 
             row = [
-                'SST-{}'.format(self.number_of_classes), 
-                self.number_of_classes,
+                'SST-{}'.format(self.num_classes), 
+                self.num_classes,
                 total_num_sentences,
                 len(vocab),
                 len(word2VecVocab),
@@ -166,7 +177,7 @@ class SSTDataPreprocessor:
             field_names = ['Total Sentences', 'Min', 'Avg', 'Max']
             row = [total_num_sentences, min_sentence_len, avg_sentence_len, max_sentence_len]
 
-            if self.number_of_classes == 5:
+            if self.num_classes == 5:
                 field_names.extend(['Very Negative', 'Negative', 'Neutral', 'Positive', 'Very Positive'])
                 row.extend([
                     label_frequencies[0], 
@@ -216,36 +227,36 @@ class SSTDataPreprocessor:
     def get_label_stats(self, labels):
         label_frequencies = {}
 
-        if self.number_of_classes == 5:
-            label_frequencies[0] = np.count_nonzero(labels == 0)
-            label_frequencies[1] = np.count_nonzero(labels == 1)
-            label_frequencies[2] = np.count_nonzero(labels == 2)
-            label_frequencies[3] = np.count_nonzero(labels == 3)
-            label_frequencies[4] = np.count_nonzero(labels == 4)
+        if self.num_classes == 5:
+            label_frequencies[0] = labels.count(0)
+            label_frequencies[1] = labels.count(1)
+            label_frequencies[2] = labels.count(2)
+            label_frequencies[3] = labels.count(3)
+            label_frequencies[4] = labels.count(4)
         else:
-            label_frequencies[0] = np.count_nonzero(labels == 0)
-            label_frequencies[1] = np.count_nonzero(labels == 1)
+            label_frequencies[0] = labels.count(0)
+            label_frequencies[1] = labels.count(1)
 
         return label_frequencies
 
 
     def get_training_embedded(self):
         sentences = self.train[0]
-        labels = self.train[1].to_numpy()
+        labels = np.array(self.train[1])
         sentences = np.array(self.generate_sentence_embeddings(sentences))
         return [sentences, labels]
 
 
     def get_dev_embedded(self):
         sentences = self.dev[0]
-        labels = self.dev[1].to_numpy()
+        labels = np.array(self.dev[1])
         sentences = np.array(self.generate_sentence_embeddings(sentences))
         return [sentences, labels]
 
 
     def get_test_embedded(self):
         sentences = self.test[0]
-        labels = self.test[1].to_numpy()
+        labels = np.array(self.test[1])
         sentences = np.array(self.generate_sentence_embeddings(sentences))
         return [sentences, labels]
 
@@ -254,13 +265,13 @@ class SSTDataPreprocessor:
         sentence_embeddings = []
 
         for sentence in sentences:
-            word_embeddings = self.generate_word_embeddings_with_padding(sentence)
+            word_embeddings = self.generate_word_embeddings_from_sentence(sentence)
             sentence_embeddings.append(word_embeddings)
 
         return sentence_embeddings
 
 
-    def generate_word_embeddings_with_padding(self, sentence):
+    def generate_word_embeddings_from_sentence(self, sentence):
         counter = 0
         word_embeddings = []
 
@@ -270,13 +281,28 @@ class SSTDataPreprocessor:
             try:
                 word_embeddings.append(self.word2VecModel[word])
             except KeyError as error:
-                random_word_embedding = np.random.default_rng().uniform(-0.99999, 1.0, self.embedding_dimensions)
+                random_word_embedding = np.random.default_rng().uniform(-0.25, 0.25, self.embedding_dimensions)
                 word_embeddings.append(random_word_embedding)
             counter += 1
 
-        if len(word_embeddings) < self.sequence_length:
-            length_to_extend = self.sequence_length - len(word_embeddings)
-            padding = [[0] * self.embedding_dimensions] * length_to_extend
-            word_embeddings.extend(padding)
-
+        for i in range(counter, self.sequence_length):
+            word_embeddings.append([0] * 300)
+    
         return word_embeddings
+
+
+    def save_data(self, dataset):
+        pickle.dump(dataset, open('mr.p', 'wb'))
+        print('dataset dictionary w/ \'train\', \'dev\', \'test\' keys as mr.p')
+
+
+if __name__ == "__main__":
+    binary = sys.argv[1].split('=')[1].lower() == 'true'
+    static = sys.argv[2].split('=')[1].lower() == 'true'
+    
+    if binary is True:
+        num_classes = 2
+    else:
+        num_classes = 5
+
+    preprocessor = SSTDataPreprocessor('./config.json', num_classes=num_classes, static=static)

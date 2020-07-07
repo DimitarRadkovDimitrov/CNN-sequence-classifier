@@ -1,17 +1,4 @@
 {
-    "datasets": {
-        "root": "./datasets",
-        "sst_2": {
-            "train": "./datasets/sst-2_train",
-            "dev": "./datasets/sst-2_dev",
-            "test": "./datasets/sst-2_test"
-        },
-        "sst_5": {
-            "train": "./datasets/sst-5_train",
-            "dev": "./datasets/sst-5_dev",
-            "test": "./datasets/sst-5_test"
-        }
-    },
     "models": {
         "root": "./models",
         "w2v_static": "./models/w2v_static_map.bin",
