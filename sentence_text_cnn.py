@@ -1,30 +1,32 @@
+import json
 import tensorflow as tf
 import numpy as np
-from tensorflow.keras import Input, Model, layers, regularizers, initializers, optimizers
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
+from tensorflow.keras import Input, Model, layers, initializers, optimizers
+from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.utils import to_categorical
 from sklearn.metrics import classification_report
+
 
 class SentenceTextCNN:
     """ Text Classification Convolutional Neural Network """
 
-    def __init__(self, **kwargs):
-        valid_keys = [
-            'seq_length', 
-            'embedding_dimensions',
-            'filter_sizes',
-            'num_filters_per_size', 
-            'num_classes',
-            'dropout_rate',
-            'batch_size',
-            'lr_decay',
-        ]
-        
-        for key in valid_keys:
-            setattr(self, key, kwargs.get(key))
-
+    def __init__(self, config_filename):
+        self.load_config_file(config_filename)
+        self.num_classes = self.config['data']['num_classes']
+        self.seq_length = self.config['data']['seq_length']
+        self.embedding_dimensions = self.config['data']['embedding_dims']
+        self.filter_sizes = self.config['CNN']['filter_sizes']
+        self.num_filters_per_size = self.config['CNN']['output_filters_per_size']
+        self.dropout_rate = self.config['CNN']['dropout_rate']
+        self.batch_size = self.config['CNN']['batch_size']
+        self.lr_decay = self.config['CNN']['lr_decay']
+        self.num_epochs = self.config['CNN']['num_epochs']
         self.model = self.build_model()
 
+
+    def load_config_file(self, filename):
+        with open(filename, "r") as f:
+            self.config = json.load(f)
     
     def build_model(self):
         input_shape = (self.seq_length, self.embedding_dimensions, 1)
@@ -79,7 +81,7 @@ class SentenceTextCNN:
         return model
 
 
-    def train(self, train_x, train_y, dev_x=None, dev_y=None, num_epochs=5):
+    def train(self, train_x, train_y, dev_x=None, dev_y=None):
         early_stopping = EarlyStopping(monitor='val_loss', patience=10)      
         train_y = to_categorical(train_y, num_classes=self.num_classes)
 
@@ -89,7 +91,7 @@ class SentenceTextCNN:
                 train_x,
                 train_y,
                 self.batch_size,
-                num_epochs,
+                self.num_epochs,
                 validation_data=(dev_x, dev_y),
                 callbacks=[early_stopping],
                 shuffle=True
@@ -99,7 +101,7 @@ class SentenceTextCNN:
                 train_x,
                 train_y,
                 self.batch_size,
-                num_epochs,
+                self.num_epochs,
                 validation_split=0.20,
                 callbacks=[early_stopping],
                 shuffle=True

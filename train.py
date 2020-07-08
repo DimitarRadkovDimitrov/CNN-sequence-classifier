@@ -1,36 +1,17 @@
-import csv
+import json
 import pickle
-import tensorflow as tf
-import numpy as np
 import matplotlib.pyplot as plt
-from tensorflow.keras.utils import to_categorical
 from sentence_text_cnn import SentenceTextCNN
-from sst_data_preprocessor import SSTDataPreprocessor
+
 
 if __name__ == "__main__":
-    num_classes = 2
-    seq_length = 40
-    embedding_dimensions = 300
-    filter_sizes = [3, 4, 5]
-    num_filters_per_size = 100
-    dropout_rate = 0.5
-    batch_size = 50
-    lr_decay = 0.95
-    norm_lim = 3
+    config_filename = './config.json'
+    cnn = SentenceTextCNN(config_filename)
 
-    cnn = SentenceTextCNN(
-        num_classes=num_classes,
-        seq_length=seq_length,
-        embedding_dimensions=embedding_dimensions,
-        filter_sizes=filter_sizes,
-        num_filters_per_size=num_filters_per_size,
-        dropout_rate=dropout_rate,
-        batch_size=batch_size,
-        lr_decay=lr_decay,
-        norm_lim=norm_lim
-    )
+    with open(config_filename, "r") as f:
+        config = json.load(f)
     
-    dataset = pickle.load(open('mr.p', 'rb'))
+    dataset = pickle.load(open(config['data']['output'], 'rb'))
     train_x = dataset['train'][0]
     train_y = dataset['train'][1]
     dev_x = dataset['dev'][0]
@@ -39,7 +20,7 @@ if __name__ == "__main__":
     test_y = dataset['test'][1]
 
     cnn.model.summary()
-    history = cnn.train(train_x, train_y, dev_x, dev_y, num_epochs=100)
+    history = cnn.train(train_x, train_y, dev_x, dev_y)
     report = cnn.evaluate(test_x, test_y)
     print(report)
 

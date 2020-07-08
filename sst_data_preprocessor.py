@@ -6,26 +6,24 @@ import numpy as np
 import time
 import pickle
 import sys
-import matplotlib.pyplot as plt
 from prettytable import PrettyTable
 from gensim import downloader
 from gensim.models import KeyedVectors, Word2Vec
-from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 
 class SSTDataPreprocessor:
     """ Data preprocessing class """
 
-    def __init__(self, config_filename, num_classes=2, static=True):
-        self.num_classes = num_classes
-        self.sequence_length = 40
-        self.embedding_dimensions = 300
-        self.static = static
-
+    def __init__(self, config_filename):
         self.load_config_file(config_filename)
+        self.num_classes = self.config['data']['num_classes']
+        self.sequence_length = self.config['data']['seq_length']
+        self.embedding_dimensions = self.config['data']['embedding_dims']
+        self.static = self.config['data']['static']
+
         self.load_dataset()
         
-        if static is True:
+        if self.static is True:
             if not os.path.isdir(self.config['models']['root']):
                os.mkdir(self.config['models']['root'])
                self.download_and_save_models()
@@ -292,17 +290,11 @@ class SSTDataPreprocessor:
 
 
     def save_data(self, dataset):
-        pickle.dump(dataset, open('mr.p', 'wb'))
-        print('dataset dictionary w/ \'train\', \'dev\', \'test\' keys as mr.p')
+        pickle.dump(dataset, open(self.config['data']['output'], 'wb'))
+        print('dataset dictionary w/ \'train\', \'dev\', \'test\' keys as {}'.format(
+            self.config['data']['output']
+        ))
 
 
 if __name__ == "__main__":
-    binary = sys.argv[1].split('=')[1].lower() == 'true'
-    static = sys.argv[2].split('=')[1].lower() == 'true'
-    
-    if binary is True:
-        num_classes = 2
-    else:
-        num_classes = 5
-
-    preprocessor = SSTDataPreprocessor('./config.json', num_classes=num_classes, static=static)
+    preprocessor = SSTDataPreprocessor('./config.json')

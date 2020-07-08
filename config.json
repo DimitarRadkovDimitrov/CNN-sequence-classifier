@@ -1,7 +1,21 @@
 {
+    "data": {
+        "num_classes": 2,
+        "seq_length": 48,
+        "embedding_dims": 300,
+        "static": true,
+        "output": "./dataset.bin"
+    },
+    "CNN": {
+        "filter_sizes": [3, 4, 5],
+        "output_filters_per_size": 100,
+        "dropout_rate": 0.5,
+        "batch_size": 50,
+        "lr_decay": 0.95,
+        "num_epochs": 100
+    },
     "models": {
         "root": "./models",
-        "w2v_static": "./models/w2v_static_map.bin",
-        "w2v_non_static": "./models/w2v_non_static_map.bin"
+        "w2v_static": "./models/w2v_static_map.bin"
     }
 }
