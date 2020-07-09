@@ -1,7 +1,7 @@
 {
     "data": {
         "num_classes": 2,
-        "seq_length": 48,
+        "seq_length": 53,
         "embedding_dims": 300,
         "static": true,
         "output": "./dataset.bin"
@@ -12,7 +12,7 @@
         "dropout_rate": 0.5,
         "batch_size": 50,
         "lr_decay": 0.95,
-        "num_epochs": 100
+        "num_epochs": 50
     },
     "models": {
         "root": "./models",
