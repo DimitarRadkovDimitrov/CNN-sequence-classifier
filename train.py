@@ -1,3 +1,4 @@
+import sys
 import json
 import pickle
 import matplotlib.pyplot as plt
@@ -5,10 +6,10 @@ from sentence_text_cnn import SentenceTextCNN
 
 
 if __name__ == "__main__":
-    config_filename = './config.json'
-    cnn = SentenceTextCNN(config_filename)
+    path_to_config = sys.argv[1]
+    cnn = SentenceTextCNN(path_to_config)
 
-    with open(config_filename, "r") as f:
+    with open(path_to_config, "r") as f:
         config = json.load(f)
     
     dataset = pickle.load(open(config['data']['output'], 'rb'))

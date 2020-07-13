@@ -1,7 +1,9 @@
+import pickle
 import json
 import tensorflow as tf
 import numpy as np
 from tensorflow.keras import Input, Model, layers, initializers, optimizers
+from tensorflow.keras.initializers import Constant
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.utils import to_categorical
 from sklearn.metrics import classification_report
@@ -15,12 +17,16 @@ class SentenceTextCNN:
         self.num_classes = self.config['data']['num_classes']
         self.seq_length = self.config['data']['seq_length']
         self.embedding_dimensions = self.config['data']['embedding_dims']
+        self.embedding_training = not(self.config['CNN']['static'])
         self.filter_sizes = self.config['CNN']['filter_sizes']
         self.num_filters_per_size = self.config['CNN']['output_filters_per_size']
+        self.activation_fn = self.config['CNN']['activation_function']
         self.dropout_rate = self.config['CNN']['dropout_rate']
         self.batch_size = self.config['CNN']['batch_size']
         self.lr_decay = self.config['CNN']['lr_decay']
         self.num_epochs = self.config['CNN']['num_epochs']
+        self.data = pickle.load(open(self.config['data']['output'], 'rb'))
+        self.index_to_vector_map = self.data['index_to_vector_map']
         self.model = self.build_model()
 
 
@@ -28,16 +34,27 @@ class SentenceTextCNN:
         with open(filename, "r") as f:
             self.config = json.load(f)
     
+
     def build_model(self):
-        input_shape = (self.seq_length, self.embedding_dimensions, 1)
-        inputs = Input(shape=input_shape)
+        input_shape = (self.seq_length,)
+        inputs = Input(shape=input_shape, dtype='int32')
     
+        embedding = layers.Embedding(
+            len(self.index_to_vector_map),
+            self.embedding_dimensions,
+            input_length=self.seq_length,
+            trainable=self.embedding_training
+        )
+        embedding.build((None, len(self.index_to_vector_map)))
+        embedding.set_weights([self.index_to_vector_map])
         concatenate = layers.Concatenate(axis=-1)
         flatten = layers.Flatten(data_format='channels_last')
         dropout = layers.Dropout(self.dropout_rate)
         dense = layers.Dense(self.num_classes, activation='softmax')
         
         pooled_outputs = []
+        x_embedding = embedding(inputs)
+        x_embedding = tf.expand_dims(x_embedding, -1)
 
         for filter_size in self.filter_sizes:
             filter_shape = (filter_size, self.embedding_dimensions)
@@ -47,14 +64,14 @@ class SentenceTextCNN:
                 filter_shape,
                 1,
                 padding='VALID',
-                activation='relu',
+                activation=self.activation_fn,
                 kernel_initializer=initializers.RandomUniform(minval=-0.01, maxval=0.01),
                 bias_initializer=initializers.zeros(),
                 use_bias=True,
                 data_format='channels_last',
-                input_shape=input_shape
+                input_shape=(self.seq_length, self.embedding_dimensions, 1)
             )
-            x = conv2d(inputs)
+            x = conv2d(x_embedding)
             x = tf.nn.max_pool(
                 x,
                 ksize=[1, self.seq_length - filter_size + 1, 1, 1],
@@ -123,6 +140,7 @@ class SentenceTextCNN:
         report = classification_report(
             test_y,
             pred_y,
-            target_names=target_names
+            target_names=target_names,
+            digits=4
         )
         return report
