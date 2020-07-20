@@ -2,6 +2,7 @@
     "data": {
         "num_classes": 2,
         "seq_length": 53,
+        "bert_embeddings": false,
         "embedding_dims": 300,
         "output": "./data.bin"
     },
@@ -12,8 +13,9 @@
         "output_filters_per_size": 100,
         "dropout_rate": 0.5,
         "batch_size": 50,
+        "learning_rate": 0.01,
         "lr_decay": 0.95,
-        "num_epochs": 100
+        "num_epochs": 50
     },
     "models": {
         "root": "./models",

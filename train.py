@@ -7,11 +7,11 @@ from sentence_text_cnn import SentenceTextCNN
 
 if __name__ == "__main__":
     path_to_config = sys.argv[1]
-    cnn = SentenceTextCNN(path_to_config)
 
     with open(path_to_config, "r") as f:
         config = json.load(f)
-    
+
+    cnn = SentenceTextCNN(config)
     dataset = pickle.load(open(config['data']['output'], 'rb'))
     train_x = dataset['train'][0]
     train_y = dataset['train'][1]

@@ -12,8 +12,8 @@ from sklearn.metrics import classification_report
 class SentenceTextCNN:
     """ Text Classification Convolutional Neural Network """
 
-    def __init__(self, config_filename):
-        self.load_config_file(config_filename)
+    def __init__(self, config):
+        self.config = config
         self.num_classes = self.config['data']['num_classes']
         self.seq_length = self.config['data']['seq_length']
         self.embedding_dimensions = self.config['data']['embedding_dims']
@@ -23,16 +23,12 @@ class SentenceTextCNN:
         self.activation_fn = self.config['CNN']['activation_function']
         self.dropout_rate = self.config['CNN']['dropout_rate']
         self.batch_size = self.config['CNN']['batch_size']
+        self.learning_rate = self.config['CNN']['learning_rate']
         self.lr_decay = self.config['CNN']['lr_decay']
         self.num_epochs = self.config['CNN']['num_epochs']
-        self.data = pickle.load(open(self.config['data']['output'], 'rb'))
-        self.index_to_vector_map = self.data['index_to_vector_map']
+        data = pickle.load(open(self.config['data']['output'], 'rb'))
+        self.index_to_vector_map = data['index_to_vector_map']
         self.model = self.build_model()
-
-
-    def load_config_file(self, filename):
-        with open(filename, "r") as f:
-            self.config = json.load(f)
     
 
     def build_model(self):
@@ -58,7 +54,7 @@ class SentenceTextCNN:
 
         for filter_size in self.filter_sizes:
             filter_shape = (filter_size, self.embedding_dimensions)
-            
+
             conv2d = layers.Conv2D(
                 self.num_filters_per_size,
                 filter_shape,
@@ -81,7 +77,11 @@ class SentenceTextCNN:
             x = flatten(x)
             pooled_outputs.append(x)
         
-        pooled_outputs = concatenate(pooled_outputs)
+        if len(pooled_outputs) == 1:
+            pooled_outputs = tf.convert_to_tensor(pooled_outputs[0])
+        else:
+            pooled_outputs = concatenate(pooled_outputs)
+
         pooled_outputs = dropout(pooled_outputs)
         pooled_outputs = dense(pooled_outputs)
 
@@ -89,7 +89,7 @@ class SentenceTextCNN:
         model.compile(
             loss='categorical_crossentropy',
             optimizer=optimizers.Adadelta(
-                learning_rate=0.01,
+                learning_rate=self.learning_rate,
                 rho=self.lr_decay,
                 epsilon=1e-6,
             ),
@@ -99,7 +99,7 @@ class SentenceTextCNN:
 
 
     def train(self, train_x, train_y, dev_x=None, dev_y=None):
-        early_stopping = EarlyStopping(monitor='val_loss', patience=10)      
+        early_stopping = EarlyStopping(monitor='val_loss', patience=5)      
         train_y = to_categorical(train_y, num_classes=self.num_classes)
 
         if dev_x is not None and dev_y is not None:
