@@ -46,8 +46,8 @@ class HyperparameterTuner:
         print('Finding optimal batch size, epochs combination with baseline configuration:')
         self.print_configuration()
 
-        batch_size = [10, 30, 50, 70, 100]
-        epochs = [10, 50, 100]
+        batch_size = [32, 64, 128, 256, 512, 1024]
+        epochs = [10, 50, 100, 500, 1000]
 
         param_grid = dict(batch_size=batch_size, epochs=epochs)
         model = KerasClassifier(build_fn=self.build_fn, verbose=0)
