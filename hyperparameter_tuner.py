@@ -30,14 +30,13 @@ class HyperparameterTuner:
 
         self.train_x = np.concatenate((train[0], dev[0]))
         self.train_y = np.concatenate((train[1], dev[1])) 
+
         self.batch_size, self.epochs = self.best_batch_size_and_epochs()
         individual_filter_size = self.best_individual_filter_size()
         self.filter_sizes = self.best_filter_size_combination(individual_filter_size)
-        best_results = self.best_model_configuration()
-        self.output_filters_per_size = best_results['output_filters_per_size']
-        self.activation_function = best_results['activation_function']
-        self.dropout_rate = best_results['dropout_rate']
-
+        self.activation_function = self.best_activation_function()
+        self.output_filters_per_size, self.dropout_rate = self.best_num_feature_maps_and_dropout()
+        
         print('Optimal configuration:')
         self.print_configuration()
 
@@ -66,7 +65,7 @@ class HyperparameterTuner:
         param_grid = dict(filter_sizes=filter_sizes)
         grid_result = self.get_grid_result(param_grid)
         self.print_grid_result(grid_result)
-        return grid_result.best_params_['filter_sizes']
+        return grid_result.best_params_['filter_sizes'][0]
 
 
     def best_filter_size_combination(self, best_ind_size):
@@ -85,22 +84,34 @@ class HyperparameterTuner:
         return grid_result.best_params_['filter_sizes']
 
 
-    def best_model_configuration(self):
-        print('Finding optimal model configuration with:')
+    def best_activation_function(self):
+        print(f'Finding optimal activation function (tanh, relu):')
+        self.activation_function = None
+        self.print_configuration()
+
+        activation_function = ['relu', 'tanh']
+        param_grid = dict(activation_function=activation_function)
+        grid_result = self.get_grid_result(param_grid)
+        self.print_grid_result(grid_result)
+        grid_result.best_params_['activation_function']
+
+
+    def best_num_feature_maps_and_dropout(self):
+        print('Finding optimal number of feature maps per filter and dropout rate:')
+        self.output_filters_per_size = None
+        self.dropout_rate = None
         self.print_configuration()
 
         output_filters_per_size = [100, 200, 300, 400, 500, 600]
-        activation_function = ['relu', 'tanh']
         dropout_rate = [0.1, 0.2, 0.3, 0.4, 0.5]
 
         param_grid = dict(
             output_filters_per_size=output_filters_per_size,
-            activation_function=activation_function,
             dropout_rate=dropout_rate
         )
         grid_result = self.get_grid_result(param_grid)
         self.print_grid_result(grid_result)
-        return grid_result.best_params_
+        return grid_result.best_params_['output_filters_per_size'], grid_result.best_params_['dropout_rate']
 
 
     def get_grid_result(self, param_grid):
