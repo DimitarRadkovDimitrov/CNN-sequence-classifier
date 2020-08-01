@@ -7,9 +7,7 @@ import itertools
 import numpy as np
 from sentence_text_cnn import SentenceTextCNN
 from sklearn.model_selection import GridSearchCV, PredefinedSplit
-from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.wrappers.scikit_learn import KerasClassifier
-
 
 class HyperparameterTuner:
     """ Hyperparameter tuning class """
@@ -95,7 +93,7 @@ class HyperparameterTuner:
         param_grid = dict(activation_function=activation_function)
         grid_result = self.get_grid_result(param_grid)
         self.print_grid_result(grid_result)
-        return grid_result.best_params_['activation_function']
+        grid_result.best_params_['activation_function']
 
 
     def best_num_feature_maps_and_dropout(self):
@@ -117,10 +115,9 @@ class HyperparameterTuner:
 
 
     def get_grid_result(self, param_grid):
-        early_stopping = EarlyStopping(monitor='val_loss', patience=5)  
         model = KerasClassifier(build_fn=self.build_fn, epochs=self.epochs, batch_size=self.batch_size, verbose=0)
         clf = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=-1, cv=self.split)
-        grid_result = clf.fit(self.train_x, self.train_y, callbacks=[early_stopping])
+        grid_result = clf.fit(self.train_x, self.train_y)
         return grid_result
 
 
