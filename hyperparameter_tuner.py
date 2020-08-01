@@ -51,9 +51,10 @@ class HyperparameterTuner:
         epochs = [10, 50, 100, 500, 1000]
 
         param_grid = dict(batch_size=batch_size, epochs=epochs)
+        early_stopping = EarlyStopping(monitor='val_loss', patience=5)  
         model = KerasClassifier(build_fn=self.build_fn, verbose=0)
         clf = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=-1, cv=self.split)
-        grid_result = clf.fit(self.train_x, self.train_y)
+        grid_result = clf.fit(self.train_x, self.train_y, callbacks=[early_stopping])
         self.print_grid_result(grid_result)
         return grid_result.best_params_['batch_size'], grid_result.best_params_['epochs']
 
