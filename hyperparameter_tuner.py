@@ -26,7 +26,8 @@ class HyperparameterTuner:
 
         print(f'Finding optimal CNN model configuration with:')
         print(f"Number of classes: {self.baseline_config['data']['num_classes']}")
-        print(f"Static: {self.baseline_config['CNN']['static']}\n\n")
+        print(f"Static: {self.baseline_config['CNN']['static']}")
+        print(f"Dataset path: {self.baseline_config['data']['output']}\n\n")
 
         self.activation_function = self.baseline_config['CNN']['activation_function']
         self.filter_sizes = self.baseline_config['CNN']['filter_sizes']
@@ -155,14 +156,14 @@ class HyperparameterTuner:
         print()
 
 
-def get_baseline_config(num_classes, static):
+def get_baseline_config(num_classes, static, data_path):
     config = {}
     config['data'] = {}
     config['CNN'] = {}
     config['data']['num_classes'] = num_classes
     config['data']['seq_length'] = 53
     config['data']['embedding_dims'] = 300
-    config['data']['output'] = './data.bin'
+    config['data']['output'] = data_path
     config['CNN']['static'] = static
     config['CNN']['activation_function'] = 'relu'
     config['CNN']['filter_sizes'] = [3, 4, 5]
@@ -176,13 +177,10 @@ def get_baseline_config(num_classes, static):
 
 
 if __name__ == '__main__':
-    num_classes = 2
-    static = True
+    num_classes = int(sys.argv[1].split('=')[1])
+    static = sys.argv[2].split('=')[1] == 'true'
+    data_path = sys.argv[3].split('=')[1]
 
-    if len(sys.argv) >= 3:
-        num_classes = int(sys.argv[1].split('=')[1])
-        static = sys.argv[2].split('=')[1] == 'true'
-
-    config = get_baseline_config(num_classes, static)
-    data = pickle.load(open(config['data']['output'], 'rb'))
+    config = get_baseline_config(num_classes, static, data_path)
+    data = pickle.load(open(data_path, 'rb'))
     parameter_tuner = HyperparameterTuner(data['train'], data['dev'], config, cross_val=False)
