@@ -21,15 +21,19 @@ class HyperparameterTuner:
             dev_samples = [0 for i in range(len(dev[0]))]
             self.split = PredefinedSplit(test_fold=np.concatenate((train_samples, dev_samples)))
         
+        self.train_x = np.concatenate((train[0], dev[0]))
+        self.train_y = np.concatenate((train[1], dev[1])) 
+
+        print(f'Finding optimal CNN model configuration with:')
+        print(f"Number of classes: {self.baseline_config['data']['num_classes']}")
+        print(f"Static: {self.baseline_config['CNN']['static']}\n\n")
+
         self.activation_function = self.baseline_config['CNN']['activation_function']
         self.filter_sizes = self.baseline_config['CNN']['filter_sizes']
         self.output_filters_per_size = self.baseline_config['CNN']['output_filters_per_size']
         self.dropout_rate = self.baseline_config['CNN']['dropout_rate']
         self.batch_size = None
         self.epochs = None
-
-        self.train_x = np.concatenate((train[0], dev[0]))
-        self.train_y = np.concatenate((train[1], dev[1])) 
 
         self.batch_size, self.epochs = self.best_batch_size_and_epochs()
         individual_filter_size = self.best_individual_filter_size()
@@ -93,7 +97,7 @@ class HyperparameterTuner:
         param_grid = dict(activation_function=activation_function)
         grid_result = self.get_grid_result(param_grid)
         self.print_grid_result(grid_result)
-        grid_result.best_params_['activation_function']
+        return grid_result.best_params_['activation_function']
 
 
     def best_num_feature_maps_and_dropout(self):
@@ -151,15 +155,15 @@ class HyperparameterTuner:
         print()
 
 
-def get_baseline_config():
+def get_baseline_config(num_classes, static):
     config = {}
     config['data'] = {}
     config['CNN'] = {}
-    config['data']['num_classes'] = 2
+    config['data']['num_classes'] = num_classes
     config['data']['seq_length'] = 53
     config['data']['embedding_dims'] = 300
     config['data']['output'] = './data.bin'
-    config['CNN']['static'] = True
+    config['CNN']['static'] = static
     config['CNN']['activation_function'] = 'relu'
     config['CNN']['filter_sizes'] = [3, 4, 5]
     config['CNN']['output_filters_per_size'] = 100
@@ -172,6 +176,13 @@ def get_baseline_config():
 
 
 if __name__ == '__main__':
-    config = get_baseline_config()
+    num_classes = 2
+    static = True
+
+    if len(sys.argv) >= 3:
+        num_classes = int(sys.argv[1].split('=')[1])
+        static = sys.argv[2].split('=')[1] == 'true'
+
+    config = get_baseline_config(num_classes, static)
     data = pickle.load(open(config['data']['output'], 'rb'))
     parameter_tuner = HyperparameterTuner(data['train'], data['dev'], config, cross_val=False)
